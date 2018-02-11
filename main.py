@@ -3,13 +3,15 @@ import torch.nn as nn
 import torch.autograd as autograd
 import torch.optim as optim
 
+from data.sample_data import *
+
 from models.ngramlm import NGramLangModel
 from models.cbow import CBOW
-from data.sample_data import *
+from models.postagger import PosTagger
 
 torch.manual_seed(1)
 
-model = 2
+model = 3
 
 if model == 1:
     # NGramLangModel
@@ -97,6 +99,57 @@ elif model == 2:
 
             total_loss += loss.data
         losses.append(total_loss)
+
+    print(losses)
+
+elif model == 3:
+
+    print("PoS Tagger!")
+    embedding_dim = 6
+    hidden_dim = 6
+
+    training_data = training_data
+
+    word_to_ix = {}
+    for sent, tags in training_data:
+        for word in sent:
+            if word not in word_to_ix:
+                word_to_ix[word] = len(word_to_ix)
+    tag_to_ix = {"DET": 0, "NN": 1, "V": 2}
+
+
+    losses = []
+    loss_fn = nn.NLLLoss()
+    model = PosTagger(vocab_size = len(word_to_ix), embedding_dim = embedding_dim,
+                      hidden_dim = hidden_dim, num_layers = 1, num_tags = len(tag_to_ix))
+    optimizer = optim.SGD(model.parameters(), lr = 0.1)
+
+    inputs = autograd.Variable(torch.LongTensor([word_to_ix[w] for w in training_data[0][0]]))
+    tag_scores = model(inputs)
+    print(tag_scores)
+
+    for epoch in range(50):
+        total_loss = torch.Tensor([0])
+        for sent, tags in training_data:
+
+            model.zero_grad()
+            model.hidden = model.initialize_hidden()
+
+            input_sentence = autograd.Variable(torch.LongTensor([word_to_ix[w] for w in sent]))
+            target_output = autograd.Variable(torch.LongTensor([tag_to_ix[t] for t in tags]))
+
+            tag_scores = model(input_sentence)
+
+            loss = loss_fn(tag_scores, target_output)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.data
+        losses.append(total_loss)
+
+    inputs = autograd.Variable(torch.LongTensor([word_to_ix[w] for w in training_data[0][0]]))
+    tag_scores = model(inputs)
+    print(tag_scores)
 
     print(losses)
 
